@@ -105,9 +105,17 @@ export const useStore = create<Store>()(
                 set((state) => ({ threads: state.threads.filter((t) => t.id !== threadId) })),
             updateThreadCodeContext: (threadId, newCode) =>
                 set((state) => ({
-                    threads: state.threads.map((t) =>
-                        t.id === threadId ? { ...t, codeContext: newCode } : t
-                    ),
+                    threads: state.threads.map((t) => {
+                        if (t.id !== threadId) return t;
+                        // Update code context and adjust range to match new code length
+                        const newLineCount = newCode.split('\n').length;
+                        const newRange = t.range ? {
+                            ...t.range,
+                            endLineNumber: t.range.startLineNumber + newLineCount - 1,
+                            endColumn: newCode.split('\n').pop()?.length || 1,
+                        } : null;
+                        return { ...t, codeContext: newCode, range: newRange };
+                    }),
                 })),
         }),
         {

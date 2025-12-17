@@ -66,13 +66,34 @@ ${codeContext}
 ### Response Format
 1. **Quick Summary**: One sentence describing what this code does and your main finding
 2. **Specific Findings**: List concrete issues with exact references to the code
-3. **Improved Code**: If suggesting changes, provide the complete improved version
+3. **Improved Code**: If suggesting changes, provide the COMPLETE improved code
 
-### Code Suggestions
-- Reference the exact function/variable you're improving
+### Code Suggestions - CRITICAL
+- **ALWAYS return the ENTIRE code block** with your changes applied, not just the modified portion
+- The user will use "Apply Changes" to replace their selection with your code block
+- If you only return a snippet, the rest of their code will be deleted
 - Use \`\`\`${detectedLang} code blocks
-- Make minimal changes - don't rewrite code that doesn't need changing
-- Include brief inline comments explaining significant changes`;
+- Make minimal changes to the code itself, but ALWAYS include the full context
+- Include brief inline comments explaining significant changes
+
+**Example - WRONG (partial code):**
+\`\`\`${detectedLang}
+// Just showing the fix:
+if (items != null) {
+    return items.reduce((a, b) => a + b, 0);
+}
+\`\`\`
+
+**Example - CORRECT (complete code):**
+\`\`\`${detectedLang}
+function calculateTotal(items) {
+    // Added null check
+    if (items == null) {
+        return 0;
+    }
+    return items.reduce((a, b) => a + b, 0);
+}
+\`\`\``;
 };
 
 class OpenAIService implements AIService {
