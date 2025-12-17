@@ -236,8 +236,8 @@ const CodeRunner: React.FC<CodeRunnerProps> = ({ code, language, onClose }) => {
             setOutput([{ type: 'info', content: '🐍 Running Python code...' }]);
 
             // Use Pyodide's built-in output capture
-            pyodide.setStdout({ batched: (text: string) => {} }); // Clear any handlers
-            pyodide.setStderr({ batched: (text: string) => {} });
+            pyodide.setStdout({ batched: (_text: string) => {} }); // Clear any handlers
+            pyodide.setStderr({ batched: (_text: string) => {} });
 
             // Reset stdout/stderr with fresh StringIO buffers
             await pyodide.runPythonAsync(`
