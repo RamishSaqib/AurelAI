@@ -204,7 +204,7 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
                 {/* Run Code Button - For supported languages */}
                 {['javascript', 'typescript', 'python', 'html', 'css', 'json', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'php'].includes(language) && (
                     <button
-                        onClick={() => setShowRunner(!showRunner)}
+                        onClick={() => setShowRunner(true)}
                         className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md shadow-lg transition-colors"
                         title={language === 'html' || language === 'css' ? 'Preview' : ['java', 'cpp', 'c', 'go', 'rust'].includes(language) ? 'Compile & Run' : 'Run Code'}
                     >
