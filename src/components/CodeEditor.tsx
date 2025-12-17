@@ -237,6 +237,7 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
                         automaticLayout: true,
                         padding: { top: 20 },
                         scrollBeyondLastLine: false,
+                        contextmenu: false,
                     }}
                 />
 
