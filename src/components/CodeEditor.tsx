@@ -27,6 +27,7 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
     const [showAskAI, setShowAskAI] = useState(false);
     const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
     const [showRunner, setShowRunner] = useState(false);
+    const [runKey, setRunKey] = useState(0);
     const [refactorMenu, setRefactorMenu] = useState<{ code: string; position: { x: number; y: number } } | null>(null);
     const { setActiveSelection, addThread, threads, language, setActiveThread, setApplyCodeCallback } = useStore();
 
@@ -204,7 +205,10 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
                 {/* Run Code Button - For supported languages */}
                 {['javascript', 'typescript', 'python', 'html', 'css', 'json', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'php'].includes(language) && (
                     <button
-                        onClick={() => setShowRunner(!showRunner)}
+                        onClick={() => {
+                            setRunKey(k => k + 1);
+                            setShowRunner(true);
+                        }}
                         className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md shadow-lg transition-colors"
                         title={language === 'html' || language === 'css' ? 'Preview' : ['java', 'cpp', 'c', 'go', 'rust'].includes(language) ? 'Compile & Run' : 'Run Code'}
                     >
@@ -233,6 +237,7 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
                         automaticLayout: true,
                         padding: { top: 20 },
                         scrollBeyondLastLine: false,
+                        contextmenu: false,
                     }}
                 />
 
@@ -256,6 +261,7 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
 
             {showRunner && (
                 <CodeRunner
+                    key={runKey}
                     code={editorRef.current?.getValue() || ''}
                     language={language}
                     onClose={() => setShowRunner(false)}

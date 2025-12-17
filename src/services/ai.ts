@@ -25,367 +25,83 @@ const detectLanguage = (code: string, hint?: string): string => {
 };
 
 // Build comprehensive system prompt for high-quality code review
-const buildSystemPrompt = (codeContext: string, language: string): string => {
+export const buildSystemPrompt = (codeContext: string, language: string): string => {
     const detectedLang = detectLanguage(codeContext, language);
+    const lines = codeContext.split('\n');
+    const lineCount = lines.length;
+    const isLargeFile = lineCount > 100;
 
-    return `You are an expert senior software engineer conducting a thorough code review. You have deep expertise in ${detectedLang} and software engineering best practices.
+    return `You are an expert senior software engineer providing a focused, specific code review. You have deep expertise in ${detectedLang}.
 
-## Code Under Review
+## Code Under Review (${lineCount} lines)
 \`\`\`${detectedLang}
 ${codeContext}
 \`\`\`
+${isLargeFile ? `
+## LARGE FILE WARNING (${lineCount} lines)
+This is a large code selection. When providing improved code:
+- You MUST still return the complete code block, but prioritize the most important changes
+- Make sure your response completes - don't let it get cut off
+- If the code is too large to return completely, clearly state this and provide the most critical sections
+` : ''}
+## CRITICAL INSTRUCTIONS - READ CAREFULLY
 
-## Your Review Guidelines
+### Be Specific, Not Generic
+- **NEVER** give generic advice like "consider adding error handling" without pointing to the exact location
+- **ALWAYS** reference specific function names, variable names, or line numbers from the code above
+- **ALWAYS** explain issues in terms of THIS code, not hypothetical scenarios
+- If the code has no issues, say "This code looks good" and explain why briefly
 
-### 1. Analysis Approach
-- First, understand the code's PURPOSE and INTENT before suggesting changes
-- Consider the broader context and how this code might fit into a larger system
-- Be specific - reference exact line numbers or variable names when discussing issues
+### What Makes a Good vs Bad Response
 
-### 2. What to Look For
-**Correctness & Bugs:**
-- Logic errors, off-by-one errors, null/undefined handling
-- Race conditions or async issues
-- Missing edge cases
-- Incorrect algorithm implementations
+**BAD (generic, unhelpful):**
+- "Consider adding input validation"
+- "You might want to add error handling"
+- "Consider using TypeScript types"
 
-**Security Issues:**
-- SQL injection, XSS, command injection vulnerabilities
-- Sensitive data exposure
-- Authentication/authorization flaws
-- Insecure dependencies or patterns
+**GOOD (specific, actionable):**
+- "The \`calculateTotal\` function on line 5 doesn't handle the case where \`items\` is null"
+- "The \`userId\` parameter in \`fetchUser(userId)\` should be validated before the API call"
+- "The \`data\` variable is typed as \`any\` - specify the expected shape: \`{ name: string; age: number }\`"
 
-**Performance:**
-- Unnecessary loops or redundant operations
-- Memory leaks or inefficient memory usage
-- N+1 query problems
-- Missing caching opportunities
+### Review Focus Areas for ${detectedLang}
+1. **Bugs**: Logic errors, null handling, async issues, edge cases
+2. **Security**: Injection vulnerabilities, data exposure, auth flaws
+3. **Performance**: Unnecessary operations, memory issues, N+1 queries
+4. **Quality**: Naming, complexity, duplication, error handling
 
-**Code Quality:**
-- Naming clarity (variables, functions, classes)
-- Single responsibility principle violations
-- Code duplication
-- Overly complex logic that could be simplified
-- Missing error handling
+### Response Format
+1. **Quick Summary**: One sentence describing what this code does and your main finding
+2. **Specific Findings**: List concrete issues with exact references to the code
+3. **Improved Code**: If suggesting changes, provide the COMPLETE improved code
 
-**Best Practices for ${detectedLang}:**
-- Idiomatic patterns and conventions
-- Modern language features that could improve the code
-- Type safety (where applicable)
-- Testability
+### Code Suggestions - CRITICAL
+- **ALWAYS return the ENTIRE code block** with your changes applied, not just the modified portion
+- The user will use "Apply Changes" to replace their selection with your code block
+- If you only return a snippet, the rest of their code will be deleted
+- Use \`\`\`${detectedLang} code blocks
+- Make minimal changes to the code itself, but ALWAYS include the full context
+- Include brief inline comments explaining significant changes
 
-### 3. Response Format
-Structure your response clearly:
-1. **Quick Summary**: One sentence overview of the code and main findings
-2. **Specific Issues**: List concrete problems with explanations
-3. **Suggestions**: Actionable improvements with code examples
-4. **Improved Code**: When suggesting changes, always provide the complete improved code block
-
-### 4. Communication Style
-- Be constructive and educational, not just critical
-- Explain WHY something is an issue, not just WHAT
-- Prioritize issues by severity (critical > major > minor > nitpick)
-- If the code is good, say so! Acknowledge well-written code
-
-### 5. Code Suggestions
-When providing code improvements:
-- Use proper syntax highlighting with language-specific code blocks
-- Include comments explaining significant changes
-- Preserve the original functionality unless explicitly asked to change it
-- Make minimal necessary changes rather than rewriting everything`;
-};
-
-class MockAIService implements AIService {
-    async sendMessage(codeContext: string, userMessage: string, _history: { role: 'user' | 'assistant', content: string }[], language?: string): Promise<string> {
-        const detectedLang = detectLanguage(codeContext, language);
-
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // Provide more intelligent mock responses based on common patterns
-                const mockResponses = this.generateIntelligentResponse(codeContext, userMessage, detectedLang);
-                resolve(mockResponses);
-            }, 1500);
-        });
-    }
-
-    private generateIntelligentResponse(code: string, question: string, language: string): string {
-        const lowerQuestion = question.toLowerCase();
-
-        // Detect what kind of help the user wants
-        if (lowerQuestion.includes('optimize') || lowerQuestion.includes('performance') || lowerQuestion.includes('faster')) {
-            return this.generateOptimizationResponse(code, language);
-        }
-
-        if (lowerQuestion.includes('bug') || lowerQuestion.includes('error') || lowerQuestion.includes('fix') || lowerQuestion.includes('wrong')) {
-            return this.generateBugAnalysis(code, language);
-        }
-
-        if (lowerQuestion.includes('security') || lowerQuestion.includes('vulnerable') || lowerQuestion.includes('safe')) {
-            return this.generateSecurityAnalysis(code, language);
-        }
-
-        if (lowerQuestion.includes('explain') || lowerQuestion.includes('what does') || lowerQuestion.includes('how does')) {
-            return this.generateExplanation(code, language);
-        }
-
-        if (lowerQuestion.includes('test') || lowerQuestion.includes('unit test')) {
-            return this.generateTestSuggestion(code, language);
-        }
-
-        if (lowerQuestion.includes('cleaner') || lowerQuestion.includes('readable') || lowerQuestion.includes('refactor') || lowerQuestion.includes('simplify')) {
-            return this.generateRefactorSuggestion(code, language);
-        }
-
-        // Default comprehensive review
-        return this.generateComprehensiveReview(code, language);
-    }
-
-    private generateOptimizationResponse(code: string, language: string): string {
-        return `## Performance Analysis
-
-**Quick Summary**: I've analyzed your ${language} code for performance optimization opportunities.
-
-### Potential Optimizations
-
-1. **Loop Efficiency**: Consider whether any loops can be replaced with more efficient operations (map/filter/reduce in JS, list comprehensions in Python).
-
-2. **Memoization**: If there are expensive calculations that might be repeated, consider caching results.
-
-3. **Early Returns**: Add early return statements to avoid unnecessary computation.
-
-### Suggested Improvement
-
-\`\`\`${language}
-// Optimized version with performance improvements
-${code.includes('for') ? code.replace(/for\s*\([^)]+\)\s*{[^}]+}/, '// Consider using Array methods like .map(), .filter(), or .reduce()') : code}
+**Example - WRONG (partial code):**
+\`\`\`${detectedLang}
+// Just showing the fix:
+if (items != null) {
+    return items.reduce((a, b) => a + b, 0);
+}
 \`\`\`
 
-**Tip**: Use your browser's Performance tab or profiling tools to identify actual bottlenecks before optimizing.`;
+**Example - CORRECT (complete code):**
+\`\`\`${detectedLang}
+function calculateTotal(items) {
+    // Added null check
+    if (items == null) {
+        return 0;
     }
-
-    private generateBugAnalysis(code: string, language: string): string {
-        const issues: string[] = [];
-
-        // Detect common bug patterns
-        if (code.includes('==') && !code.includes('===')) {
-            issues.push('- **Type Coercion**: Using `==` instead of `===` can lead to unexpected type coercion. Consider using strict equality.');
-        }
-        if (code.includes('var ')) {
-            issues.push('- **Variable Scoping**: Using `var` instead of `let`/`const` can cause scoping issues. Prefer `const` for immutable values.');
-        }
-        if (code.includes('async') && !code.includes('try')) {
-            issues.push('- **Missing Error Handling**: Async functions should have try-catch blocks to handle potential rejections.');
-        }
-        if (code.includes('.length') && code.includes('[')) {
-            issues.push('- **Array Bounds**: Ensure array access is within bounds to prevent undefined access errors.');
-        }
-
-        if (issues.length === 0) {
-            issues.push('- No obvious bugs detected in this code snippet. However, ensure to test edge cases.');
-        }
-
-        return `## Bug Analysis
-
-**Quick Summary**: I've scanned your code for potential bugs and issues.
-
-### Findings
-
-${issues.join('\n')}
-
-### Recommendations
-
-1. **Add Input Validation**: Ensure all inputs are validated before processing
-2. **Handle Edge Cases**: Consider what happens with empty arrays, null values, or unexpected types
-3. **Error Boundaries**: Add appropriate error handling
-
-\`\`\`${language}
-// Example with improved error handling
-try {
-  ${code.split('\n')[0]}
-  // ... rest of your code
-} catch (error) {
-  console.error('Error:', error.message);
-  // Handle error appropriately
+    return items.reduce((a, b) => a + b, 0);
 }
 \`\`\``;
-    }
-
-    private generateSecurityAnalysis(code: string, language: string): string {
-        const vulnerabilities: string[] = [];
-
-        if (code.includes('eval(') || code.includes('Function(')) {
-            vulnerabilities.push('- **Code Injection Risk**: `eval()` or `Function()` detected. These can execute arbitrary code and are major security risks.');
-        }
-        if (code.includes('innerHTML')) {
-            vulnerabilities.push('- **XSS Vulnerability**: `innerHTML` usage detected. This can allow script injection. Use `textContent` or sanitize input.');
-        }
-        if (code.includes('password') && code.includes('console.log')) {
-            vulnerabilities.push('- **Sensitive Data Exposure**: Logging passwords or sensitive data is a security risk.');
-        }
-        if (code.includes('http://') && !code.includes('localhost')) {
-            vulnerabilities.push('- **Insecure Protocol**: Using HTTP instead of HTTPS can expose data in transit.');
-        }
-
-        if (vulnerabilities.length === 0) {
-            vulnerabilities.push('- No obvious security vulnerabilities detected. However, always validate and sanitize user inputs.');
-        }
-
-        return `## Security Analysis
-
-**Quick Summary**: Security review of your ${language} code.
-
-### Security Findings
-
-${vulnerabilities.join('\n')}
-
-### Security Best Practices
-
-1. **Input Validation**: Always validate and sanitize user inputs
-2. **Output Encoding**: Encode output to prevent injection attacks
-3. **Least Privilege**: Only request permissions you need
-4. **Secure Defaults**: Fail securely and use secure defaults`;
-    }
-
-    private generateExplanation(code: string, language: string): string {
-        return `## Code Explanation
-
-**Quick Summary**: Here's a breakdown of what this ${language} code does.
-
-### Analysis
-
-This code appears to:
-${code.includes('function') || code.includes('const') || code.includes('def') ?
-`1. **Define functionality**: Creates reusable logic that can be called elsewhere
-2. **Process data**: Takes inputs and produces outputs` :
-`1. **Execute statements**: Performs operations in sequence
-2. **Manipulate state**: Modifies variables or data structures`}
-
-### Key Components
-
-- **Structure**: The code is organized ${code.includes('{') ? 'with blocks denoted by curly braces' : 'using indentation for structure'}
-- **Variables**: ${code.includes('const') ? 'Uses `const` for immutable bindings' : code.includes('let') ? 'Uses `let` for mutable variables' : 'Defines variables for storing data'}
-- **Logic Flow**: ${code.includes('if') ? 'Contains conditional branching' : code.includes('for') || code.includes('while') ? 'Contains iteration/looping' : 'Sequential execution'}
-
-### How to Use
-
-This code ${code.includes('export') ? 'exports functionality for use in other modules' : 'can be executed directly or integrated into a larger application'}.`;
-    }
-
-    private generateTestSuggestion(_code: string, language: string): string {
-        const testFramework = language.includes('python') ? 'pytest' : 'Jest';
-        const testSyntax = language.includes('python') ?
-            `def test_function_name():
-    # Arrange
-    input_data = ...
-
-    # Act
-    result = your_function(input_data)
-
-    # Assert
-    assert result == expected_value` :
-            `describe('YourFunction', () => {
-  it('should handle normal input correctly', () => {
-    // Arrange
-    const input = ...;
-
-    // Act
-    const result = yourFunction(input);
-
-    // Assert
-    expect(result).toBe(expectedValue);
-  });
-
-  it('should handle edge cases', () => {
-    expect(yourFunction(null)).toBeUndefined();
-    expect(yourFunction([])).toEqual([]);
-  });
-});`;
-
-        return `## Testing Suggestions
-
-**Quick Summary**: Here's how to write tests for your ${language} code using ${testFramework}.
-
-### Recommended Tests
-
-1. **Happy Path**: Test normal expected inputs
-2. **Edge Cases**: Empty inputs, null values, boundary conditions
-3. **Error Cases**: Invalid inputs that should throw errors
-
-### Example Test Structure
-
-\`\`\`${language === 'python' ? 'python' : 'typescript'}
-${testSyntax}
-\`\`\`
-
-### Testing Tips
-
-- Aim for high code coverage but focus on meaningful tests
-- Test behavior, not implementation details
-- Use descriptive test names that explain what's being tested`;
-    }
-
-    private generateRefactorSuggestion(code: string, language: string): string {
-        return `## Refactoring Suggestions
-
-**Quick Summary**: Here are ways to improve the readability and maintainability of your code.
-
-### Improvement Opportunities
-
-1. **Naming**: Use descriptive names that reveal intent
-2. **Single Responsibility**: Each function should do one thing well
-3. **DRY Principle**: Extract repeated logic into reusable functions
-4. **Early Returns**: Use guard clauses to reduce nesting
-
-### Refactored Version
-
-\`\`\`${language}
-// Improved version with better structure
-${code}
-// Consider:
-// - Breaking into smaller functions
-// - Adding type annotations (if TypeScript)
-// - Using meaningful variable names
-// - Removing magic numbers/strings
-\`\`\`
-
-### Quick Wins
-
-- Replace magic numbers with named constants
-- Add JSDoc comments for public functions
-- Use destructuring for cleaner parameter handling`;
-    }
-
-    private generateComprehensiveReview(code: string, language: string): string {
-        return `## Code Review Summary
-
-**Quick Summary**: I've reviewed your ${language} code and here are my findings.
-
-### Strengths ✅
-- The code is structured and organized
-- Basic functionality is implemented
-
-### Areas for Improvement 🔧
-
-1. **Error Handling**: Consider adding try-catch blocks for robustness
-2. **Type Safety**: ${language.includes('script') ? 'Consider adding TypeScript types for better maintainability' : 'Ensure proper type checking'}
-3. **Documentation**: Add comments explaining complex logic
-
-### Suggested Improvements
-
-\`\`\`${language}
-${code}
-\`\`\`
-
-### Recommendations
-
-1. **Add Input Validation**: Verify inputs before processing
-2. **Handle Edge Cases**: Consider empty, null, or unexpected values
-3. **Write Tests**: Ensure functionality with unit tests
-4. **Consider Performance**: Profile if dealing with large data sets
-
-Feel free to ask follow-up questions about any specific aspect!`;
-    }
-}
+};
 
 class OpenAIService implements AIService {
     private client: OpenAI | null = null;
@@ -402,7 +118,7 @@ class OpenAIService implements AIService {
 
         const systemPrompt = buildSystemPrompt(codeContext, language || 'unknown');
 
-        const messages: any[] = [
+        const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
             { role: 'system', content: systemPrompt },
             ...history,
             { role: 'user', content: userMessage }
@@ -412,7 +128,7 @@ class OpenAIService implements AIService {
             messages: messages,
             model: 'gpt-4o',
             temperature: 0.3, // Lower temperature for more focused, accurate responses
-            max_tokens: 2000,
+            max_tokens: 16000, // Increased to handle returning complete code blocks
         });
 
         return completion.choices[0].message.content || "No response generated.";
@@ -482,23 +198,28 @@ export const aiService = {
         // Limit history to prevent context overflow
         const limitedHistory = history.slice(-MAX_HISTORY_MESSAGES);
 
+        // Validate API key
+        if (!apiKey) {
+            throw new Error('API key required. Please add your OpenAI API key in Settings.');
+        }
+
+        if (!apiKey.startsWith('sk-')) {
+            throw new Error('Invalid API key. OpenAI API keys start with "sk-".');
+        }
+
         try {
-            if (apiKey && apiKey.startsWith('sk-')) {
-                const service = new OpenAIService(apiKey);
-                return await service.sendMessage(enhancedContext, userMessage, limitedHistory, language);
-            } else {
-                const service = new MockAIService();
-                return await service.sendMessage(enhancedContext, userMessage, limitedHistory, language);
-            }
-        } catch (error: any) {
+            const service = new OpenAIService(apiKey);
+            return await service.sendMessage(enhancedContext, userMessage, limitedHistory, language);
+        } catch (error: unknown) {
             // Handle specific API errors
-            if (error.message?.includes('rate limit')) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (message.includes('rate limit')) {
                 throw new Error('Rate limit exceeded. Please wait a moment and try again.');
             }
-            if (error.message?.includes('context length') || error.message?.includes('maximum')) {
+            if (message.includes('context length') || message.includes('maximum')) {
                 throw new Error('The code is too long to analyze. Try selecting a smaller portion.');
             }
-            if (error.message?.includes('API key')) {
+            if (message.includes('API key')) {
                 throw new Error('Invalid API key. Please check your settings.');
             }
             throw error;

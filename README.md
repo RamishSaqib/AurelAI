@@ -8,7 +8,8 @@ AurelAI is a standalone web application that provides intelligent, contextual co
 - **Contextual AI**: Select any code block to ask AI for feedback. The AI understands the surrounding context.
 - **Inline Threads**: Conversations happen right next to the code, visually tied to the selected block.
 - **Multiple Threads**: Support for multiple independent discussions on the same file.
-- **Mock & Real AI**: Comes with a mock AI service for demonstration, but includes an OpenAI implementation that can be enabled.
+- **Resizable Chat Panel**: Drag the divider between the editor and chat panel to customize the layout.
+- **Specific Feedback**: AI provides actionable, code-specific suggestions rather than generic advice.
 
 ## Getting Started
 
@@ -16,6 +17,7 @@ AurelAI is a standalone web application that provides intelligent, contextual co
 
 - Node.js (v16 or higher)
 - npm
+- OpenAI API key (required for AI functionality)
 
 ### Installation
 
@@ -35,13 +37,21 @@ npm run dev
 
 Open your browser to `http://localhost:5173`.
 
+### Running Tests
+
+```bash
+npm run test        # Watch mode
+npm run test:run    # Single run
+```
+
 ## Architecture
 
-- **Frontend**: React + Vite + TypeScript
+- **Frontend**: React 19 + Vite + TypeScript
 - **Editor**: `@monaco-editor/react`
-- **Styling**: TailwindCSS
-- **State Management**: Zustand
+- **Styling**: TailwindCSS 4
+- **State Management**: Zustand with localStorage persistence
 - **Icons**: Lucide React
+- **Testing**: Vitest + React Testing Library
 
 ### Key Decisions
 
@@ -51,17 +61,25 @@ Open your browser to `http://localhost:5173`.
 
 ## AI Integration
 
-The project uses a `MockAIService` by default to demonstrate functionality without needing an API key. To use real OpenAI:
+AurelAI requires an OpenAI API key to function. To configure:
 
-1. Open `src/services/ai.ts`.
-2. Instantiate `OpenAIService` with your API key instead of `MockAIService`.
+1. Click the Settings icon in the header
+2. Enter your OpenAI API key (starts with `sk-`)
+3. Save settings
 
-```typescript
-export const aiService = new OpenAIService('your-api-key');
-```
+The AI service uses GPT-4o with enhanced prompts that:
+- Reference specific function names, variables, and line numbers
+- Provide actionable suggestions rather than generic advice
+- Focus on bugs, security, performance, and code quality
+
+## Resizable Chat Panel
+
+The chat panel can be resized by dragging the horizontal divider between the code editor and chat area:
+- Minimum height: 15% of viewport
+- Maximum height: 80% of viewport
+- Default: 40% of viewport
 
 ## Future Improvements
 
-- **Persisted State**: Save threads to local storage or a backend.
-- **Diff View**: Allow AI to propose changes and show a diff.
-- **Language Detection**: Automatically detect language based on file extension or content.
+- **Persisted Panel Size**: Save panel height preference to localStorage.
+- **Horizontal Layout**: Option for side-by-side editor/chat layout.
