@@ -1,6 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aiService, buildSystemPrompt } from '../ai';
 import { useStore } from '../../store/useStore';
+
+// Mock fetch to simulate proxy being unavailable (falls back to client-side)
+global.fetch = vi.fn(() =>
+  Promise.reject(new Error('Failed to fetch'))
+);
 
 describe('aiService', () => {
   beforeEach(() => {
@@ -9,10 +14,11 @@ describe('aiService', () => {
       openFiles: [],
       language: 'typescript',
     });
+    vi.clearAllMocks();
   });
 
-  describe('API key validation', () => {
-    it('throws error when no API key is configured', async () => {
+  describe('API key validation (client-side fallback)', () => {
+    it('throws error when no API key is configured and proxy unavailable', async () => {
       useStore.setState({ apiKey: '' });
 
       await expect(
@@ -20,12 +26,25 @@ describe('aiService', () => {
       ).rejects.toThrow('API key required');
     });
 
-    it('throws error when API key is invalid format', async () => {
+    it('throws error when API key is invalid format and proxy unavailable', async () => {
       useStore.setState({ apiKey: 'invalid-key' });
 
       await expect(
         aiService.sendMessage('const x = 1;', 'review this', [])
       ).rejects.toThrow('Invalid API key');
+    });
+  });
+
+  describe('proxy behavior', () => {
+    it('tries proxy first before falling back to client-side', async () => {
+      useStore.setState({ apiKey: '' });
+
+      await expect(
+        aiService.sendMessage('const x = 1;', 'review this', [])
+      ).rejects.toThrow();
+
+      // Verify fetch was called (proxy was attempted)
+      expect(fetch).toHaveBeenCalledWith('/api/chat', expect.any(Object));
     });
   });
 });
@@ -53,5 +72,13 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt(code, 'typescript');
 
     expect(prompt.toLowerCase()).toContain('specific');
+  });
+
+  it('adds large file warning for code over 100 lines', () => {
+    const code = Array(150).fill('const x = 1;').join('\n');
+
+    const prompt = buildSystemPrompt(code, 'typescript');
+
+    expect(prompt).toContain('LARGE FILE WARNING');
   });
 });
