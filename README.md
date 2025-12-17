@@ -61,16 +61,36 @@ npm run test:run    # Single run
 
 ## AI Integration
 
-AurelAI requires an OpenAI API key to function. To configure:
+AurelAI uses OpenAI's GPT-4o model for code reviews. There are two ways to configure the API key:
+
+### Option 1: Server-Side (Recommended for Production)
+
+Configure the API key as an environment variable on Vercel:
+
+1. Go to your Vercel project settings
+2. Navigate to **Settings → Environment Variables**
+3. Add a new variable:
+   - Name: `OPENAI_API_KEY`
+   - Value: Your OpenAI API key (starts with `sk-`)
+4. Redeploy your application
+
+With this setup, users don't need to enter their own API key - it's securely stored on the server.
+
+### Option 2: Client-Side (For Local Development)
+
+If no server-side key is configured, users can enter their own key:
 
 1. Click the Settings icon in the header
 2. Enter your OpenAI API key (starts with `sk-`)
 3. Save settings
 
+### AI Features
+
 The AI service uses GPT-4o with enhanced prompts that:
 - Reference specific function names, variables, and line numbers
 - Provide actionable suggestions rather than generic advice
 - Focus on bugs, security, performance, and code quality
+- Return complete code blocks for easy "Apply Changes" functionality
 
 ## Resizable Chat Panel
 

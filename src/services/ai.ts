@@ -103,13 +103,14 @@ function calculateTotal(items) {
 \`\`\``;
 };
 
+// Client-side OpenAI service (fallback for local development)
 class OpenAIService implements AIService {
     private client: OpenAI | null = null;
 
     constructor(apiKey: string) {
         this.client = new OpenAI({
             apiKey: apiKey,
-            dangerouslyAllowBrowser: true // Note: In production, use a backend proxy
+            dangerouslyAllowBrowser: true
         });
     }
 
@@ -127,8 +128,8 @@ class OpenAIService implements AIService {
         const completion = await this.client.chat.completions.create({
             messages: messages,
             model: 'gpt-4o',
-            temperature: 0.3, // Lower temperature for more focused, accurate responses
-            max_tokens: 16000, // Increased to handle returning complete code blocks
+            temperature: 0.3,
+            max_tokens: 16000,
         });
 
         return completion.choices[0].message.content || "No response generated.";
@@ -136,9 +137,9 @@ class OpenAIService implements AIService {
 }
 
 // Constants for handling large files
-const MAX_CODE_CONTEXT_LENGTH = 15000; // ~15k characters to stay within token limits
-const MAX_FILE_CONTEXT_LENGTH = 5000; // Max per additional file
-const MAX_HISTORY_MESSAGES = 10; // Keep conversation manageable
+const MAX_CODE_CONTEXT_LENGTH = 15000;
+const MAX_FILE_CONTEXT_LENGTH = 5000;
+const MAX_HISTORY_MESSAGES = 10;
 
 // Truncate text with ellipsis indicator
 const truncateText = (text: string, maxLength: number): { text: string; truncated: boolean } => {
@@ -146,7 +147,6 @@ const truncateText = (text: string, maxLength: number): { text: string; truncate
         return { text, truncated: false };
     }
     const truncated = text.slice(0, maxLength);
-    // Try to truncate at a line boundary
     const lastNewline = truncated.lastIndexOf('\n');
     const cutPoint = lastNewline > maxLength * 0.8 ? lastNewline : maxLength;
     return {
@@ -155,7 +155,29 @@ const truncateText = (text: string, maxLength: number): { text: string; truncate
     };
 };
 
-// Singleton proxy that switches implementation based on store
+// Try server proxy first, fall back to client-side
+const sendViaProxy = async (
+    codeContext: string,
+    userMessage: string,
+    history: { role: 'user' | 'assistant', content: string }[],
+    language: string
+): Promise<string> => {
+    const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codeContext, userMessage, history, language }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.content;
+};
+
+// Singleton proxy that tries server first, falls back to client-side
 export const aiService = {
     sendMessage: async (codeContext: string, userMessage: string, history: { role: 'user' | 'assistant', content: string }[]) => {
         const apiKey = useStore.getState().apiKey;
@@ -165,7 +187,7 @@ export const aiService = {
         // Truncate main code context if too long
         const { text: truncatedCodeContext, truncated: wasCodeTruncated } = truncateText(codeContext, MAX_CODE_CONTEXT_LENGTH);
 
-        // Build enhanced context with all open files (with individual truncation)
+        // Build enhanced context with all open files
         let enhancedContext = truncatedCodeContext;
         let truncationNote = '';
 
@@ -174,8 +196,7 @@ export const aiService = {
         }
 
         if (openFiles.length > 0) {
-            // Truncate each file context and limit number of files
-            const maxFiles = 5; // Limit additional context files
+            const maxFiles = 5;
             const limitedFiles = openFiles.slice(0, maxFiles);
 
             const filesContext = limitedFiles.map(f => {
@@ -195,34 +216,50 @@ export const aiService = {
             enhancedContext += truncationNote;
         }
 
-        // Limit history to prevent context overflow
         const limitedHistory = history.slice(-MAX_HISTORY_MESSAGES);
 
-        // Validate API key
-        if (!apiKey) {
-            throw new Error('API key required. Please add your OpenAI API key in Settings.');
-        }
-
-        if (!apiKey.startsWith('sk-')) {
-            throw new Error('Invalid API key. OpenAI API keys start with "sk-".');
-        }
-
+        // Try server proxy first (works in production with OPENAI_API_KEY env var)
         try {
-            const service = new OpenAIService(apiKey);
-            return await service.sendMessage(enhancedContext, userMessage, limitedHistory, language);
-        } catch (error: unknown) {
-            // Handle specific API errors
-            const message = error instanceof Error ? error.message : String(error);
-            if (message.includes('rate limit')) {
-                throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+            return await sendViaProxy(enhancedContext, userMessage, limitedHistory, language);
+        } catch (proxyError: unknown) {
+            const proxyMessage = proxyError instanceof Error ? proxyError.message : String(proxyError);
+
+            // If proxy explicitly says no API key configured, or if it's a 404 (proxy doesn't exist),
+            // fall back to client-side with user's API key
+            const isProxyUnavailable = proxyMessage.includes('not configured') ||
+                                       proxyMessage.includes('404') ||
+                                       proxyMessage.includes('Failed to fetch');
+
+            if (!isProxyUnavailable) {
+                // Proxy exists but returned an error (rate limit, etc.) - throw it
+                throw new Error(proxyMessage);
             }
-            if (message.includes('context length') || message.includes('maximum')) {
-                throw new Error('The code is too long to analyze. Try selecting a smaller portion.');
+
+            // Fall back to client-side OpenAI
+            if (!apiKey) {
+                throw new Error('API key required. Please add your OpenAI API key in Settings.');
             }
-            if (message.includes('API key')) {
-                throw new Error('Invalid API key. Please check your settings.');
+
+            if (!apiKey.startsWith('sk-')) {
+                throw new Error('Invalid API key. OpenAI API keys start with "sk-".');
             }
-            throw error;
+
+            try {
+                const service = new OpenAIService(apiKey);
+                return await service.sendMessage(enhancedContext, userMessage, limitedHistory, language);
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : String(error);
+                if (message.includes('rate limit')) {
+                    throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+                }
+                if (message.includes('context length') || message.includes('maximum')) {
+                    throw new Error('The code is too long to analyze. Try selecting a smaller portion.');
+                }
+                if (message.includes('API key')) {
+                    throw new Error('Invalid API key. Please check your settings.');
+                }
+                throw error;
+            }
         }
     }
 };
