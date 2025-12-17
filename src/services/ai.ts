@@ -29,6 +29,7 @@ export const buildSystemPrompt = (codeContext: string, language: string): string
     const detectedLang = detectLanguage(codeContext, language);
     const lines = codeContext.split('\n');
     const lineCount = lines.length;
+    const isLargeFile = lineCount > 100;
 
     return `You are an expert senior software engineer providing a focused, specific code review. You have deep expertise in ${detectedLang}.
 
@@ -36,7 +37,13 @@ export const buildSystemPrompt = (codeContext: string, language: string): string
 \`\`\`${detectedLang}
 ${codeContext}
 \`\`\`
-
+${isLargeFile ? `
+## LARGE FILE WARNING (${lineCount} lines)
+This is a large code selection. When providing improved code:
+- You MUST still return the complete code block, but prioritize the most important changes
+- Make sure your response completes - don't let it get cut off
+- If the code is too large to return completely, clearly state this and provide the most critical sections
+` : ''}
 ## CRITICAL INSTRUCTIONS - READ CAREFULLY
 
 ### Be Specific, Not Generic
@@ -121,7 +128,7 @@ class OpenAIService implements AIService {
             messages: messages,
             model: 'gpt-4o',
             temperature: 0.3, // Lower temperature for more focused, accurate responses
-            max_tokens: 2000,
+            max_tokens: 16000, // Increased to handle returning complete code blocks
         });
 
         return completion.choices[0].message.content || "No response generated.";
