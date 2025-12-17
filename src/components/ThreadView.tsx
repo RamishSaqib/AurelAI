@@ -19,7 +19,7 @@ interface ThreadViewProps {
 const ThreadView: React.FC<ThreadViewProps> = ({ thread, onClose, isPanel = false }) => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const { addMessageToThread, language } = useStore();
+    const { addMessageToThread, language, applyCodeCallback, updateThreadCodeContext } = useStore();
     const { isListening, transcript, isSupported, startListening, stopListening, resetTranscript } = useVoiceInput();
 
     const [diffModal, setDiffModal] = useState<{ isOpen: boolean; modifiedCode: string } | null>(null);
@@ -56,8 +56,16 @@ const ThreadView: React.FC<ThreadViewProps> = ({ thread, onClose, isPanel = fals
                 timestamp: Date.now(),
             };
             addMessageToThread(thread.id, aiMsg);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
+            // Show error message to user
+            const errorMsg = {
+                id: crypto.randomUUID(),
+                role: 'assistant' as const,
+                content: `**Error:** ${error.message || 'Failed to get AI response. Please try again.'}\n\n*If using OpenAI API, check your API key in Settings.*`,
+                timestamp: Date.now(),
+            };
+            addMessageToThread(thread.id, errorMsg);
         } finally {
             setIsTyping(false);
         }
@@ -179,6 +187,15 @@ const ThreadView: React.FC<ThreadViewProps> = ({ thread, onClose, isPanel = fals
                     modifiedCode={diffModal.modifiedCode}
                     language={language}
                     onClose={() => setDiffModal(null)}
+                    threadId={thread.id}
+                    onApply={(newCode) => {
+                        // Apply the changes via the callback
+                        if (applyCodeCallback && thread.range) {
+                            applyCodeCallback(thread.id, newCode);
+                            // Update the thread's code context to reflect the change
+                            updateThreadCodeContext(thread.id, newCode);
+                        }
+                    }}
                 />
             )}
         </>

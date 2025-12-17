@@ -20,6 +20,9 @@ export interface Thread {
     codeContext: string; // The code that was selected (empty for general chat)
 }
 
+// Callback type for applying code changes
+type ApplyCodeCallback = (threadId: string, newCode: string) => void;
+
 interface Store {
     threads: Thread[];
     activeSelection: Thread['range'] | null;
@@ -30,6 +33,9 @@ interface Store {
     openFiles: Array<{ id: string; name: string; content: string; language: string }>;
     activeFileId: string | null;
     snippets: Array<{ id: string; name: string; code: string; language: string }>;
+    // Callback for applying code changes to editor
+    applyCodeCallback: ApplyCodeCallback | null;
+    setApplyCodeCallback: (callback: ApplyCodeCallback | null) => void;
     setLanguage: (language: string) => void;
     setApiKey: (key: string) => void;
     setCurrentFile: (file: { name: string; handle: FileSystemFileHandle } | null) => void;
@@ -44,6 +50,8 @@ interface Store {
     addThread: (thread: Thread) => void;
     addMessageToThread: (threadId: string, message: Message) => void;
     removeThread: (threadId: string) => void;
+    // Update thread's code context after applying changes
+    updateThreadCodeContext: (threadId: string, newCode: string) => void;
 }
 
 export const useStore = create<Store>()(
@@ -58,6 +66,8 @@ export const useStore = create<Store>()(
             openFiles: [],
             activeFileId: null,
             snippets: [],
+            applyCodeCallback: null,
+            setApplyCodeCallback: (callback) => set({ applyCodeCallback: callback }),
             setLanguage: (language) => set({ language }),
             setApiKey: (key) => set({ apiKey: key }),
             setCurrentFile: (file) => set({ currentFile: file }),
@@ -93,6 +103,12 @@ export const useStore = create<Store>()(
                 })),
             removeThread: (threadId) =>
                 set((state) => ({ threads: state.threads.filter((t) => t.id !== threadId) })),
+            updateThreadCodeContext: (threadId, newCode) =>
+                set((state) => ({
+                    threads: state.threads.map((t) =>
+                        t.id === threadId ? { ...t, codeContext: newCode } : t
+                    ),
+                })),
         }),
         {
             name: 'aurelai-storage',

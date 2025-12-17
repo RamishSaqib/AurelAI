@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useStore } from '../store/useStore';
 import { MessageSquarePlus, Play } from 'lucide-react';
@@ -28,10 +28,45 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
     const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
     const [showRunner, setShowRunner] = useState(false);
     const [refactorMenu, setRefactorMenu] = useState<{ code: string; position: { x: number; y: number } } | null>(null);
-    const { setActiveSelection, addThread, threads, language, setActiveThread } = useStore();
+    const { setActiveSelection, addThread, threads, language, setActiveThread, setApplyCodeCallback } = useStore();
 
     // Store decorations collection
     const decorationsCollection = useRef<MonacoEditor.IEditorDecorationsCollection | null>(null);
+
+    // Callback for applying code changes from AI suggestions
+    const applyCodeToThread = useCallback((threadId: string, newCode: string) => {
+        if (!editorRef.current || !monacoRef.current) return;
+
+        // Find the thread to get its range
+        const thread = threads.find(t => t.id === threadId);
+        if (!thread || !thread.range) return;
+
+        const range = new monacoRef.current.Range(
+            thread.range.startLineNumber,
+            thread.range.startColumn,
+            thread.range.endLineNumber,
+            thread.range.endColumn
+        );
+
+        // Execute the edit
+        editorRef.current.executeEdits('apply-ai-suggestion', [{
+            range: range,
+            text: newCode,
+        }]);
+
+        // Focus the editor
+        editorRef.current.focus();
+    }, [threads]);
+
+    // Register the apply callback when editor is ready
+    useEffect(() => {
+        if (editorRef.current) {
+            setApplyCodeCallback(applyCodeToThread);
+        }
+        return () => {
+            setApplyCodeCallback(null);
+        };
+    }, [applyCodeToThread, setApplyCodeCallback]);
 
     // Expose setValue method to parent
     React.useImperativeHandle(ref, () => ({
@@ -166,15 +201,21 @@ const CodeEditor = React.forwardRef<{ setValue: (value: string) => void }, CodeE
     return (
         <div className="relative h-full w-full bg-gray-900 p-4 flex flex-col">
             <div className="flex-1 border border-gray-700 rounded-lg overflow-hidden shadow-inner relative">
-                {/* Run Code Button - Only for JS/TS */}
-                {(language === 'javascript' || language === 'typescript') && (
+                {/* Run Code Button - For supported languages */}
+                {['javascript', 'typescript', 'python', 'html', 'css', 'json', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'php'].includes(language) && (
                     <button
                         onClick={() => setShowRunner(!showRunner)}
                         className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md shadow-lg transition-colors"
-                        title="Run Code"
+                        title={language === 'html' || language === 'css' ? 'Preview' : ['java', 'cpp', 'c', 'go', 'rust'].includes(language) ? 'Compile & Run' : 'Run Code'}
                     >
                         <Play size={16} />
-                        <span className="text-sm">Run</span>
+                        <span className="text-sm">
+                            {language === 'html' || language === 'css'
+                                ? 'Preview'
+                                : ['java', 'cpp', 'c', 'go', 'rust'].includes(language)
+                                    ? 'Compile'
+                                    : 'Run'}
+                        </span>
                     </button>
                 )}
 
