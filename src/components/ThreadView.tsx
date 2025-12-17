@@ -19,7 +19,7 @@ interface ThreadViewProps {
 const ThreadView: React.FC<ThreadViewProps> = ({ thread, onClose, isPanel = false }) => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const { addMessageToThread, language, applyCodeCallback, updateThreadCodeContext } = useStore();
+    const { addMessageToThread, language, applyCodeCallback, removeThread } = useStore();
     const { isListening, transcript, isSupported, startListening, stopListening, resetTranscript } = useVoiceInput();
 
     const [diffModal, setDiffModal] = useState<{ isOpen: boolean; modifiedCode: string } | null>(null);
@@ -192,8 +192,9 @@ const ThreadView: React.FC<ThreadViewProps> = ({ thread, onClose, isPanel = fals
                         // Apply the changes via the callback
                         if (applyCodeCallback && thread.range) {
                             applyCodeCallback(thread.id, newCode);
-                            // Update the thread's code context to reflect the change
-                            updateThreadCodeContext(thread.id, newCode);
+                            // Remove the thread after applying - the review is complete
+                            removeThread(thread.id);
+                            onClose();
                         }
                     }}
                 />
